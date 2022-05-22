@@ -1,0 +1,42 @@
+name: Manga Fetcher
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+    
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Fetch latest available manga
+        uses: docker://minormending/viz-manga:latest
+        with:
+          args: 
+            fetch
+            jujutsu-kaisen
+            --directory=.
+      
+      - name: Setup GitHub user
+        run: |
+          git config --local user.email "actions@github.com"
+          git config --local user.name "GitHub Actions"
+      
+      - name: Commit the changes if there are any new chapters
+        id: commit
+        run: |
+          git add .
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::set-output name=push::false"
+          else
+             git commit -m "Auto fetching latest chapters."
+             echo "::set-output name=push::true"
+          fi
+        shell: bash
+          
+      - name: Push if there are any changes
+        if: steps.commit.outputs.push == 'true'
+        run: git push origin HEAD:main
